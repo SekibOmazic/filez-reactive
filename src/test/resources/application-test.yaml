@@ -1,0 +1,10 @@
+s3:
+  local: true
+  bucket: "my-test-bucket"
+#    endpoint: "some.endpoint.com"
+#    port: 9999
+#    access-key: "some-access-key"
+#    secret-key: "some-secret-key"
+#    max-connections: 100
+#    connection-timeout: 60
+#    socket-timeout: 60

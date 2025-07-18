@@ -1,0 +1,10 @@
+s3:
+  endpoint: ${S3_ENDPOINT}
+  port: ${S3_PORT}
+  access-key: ${S3_ACCESS_KEY}
+  secret-key: ${S3_SECRET_KEY}
+  region: ${S3_REGION}
+  bucket: ${S3_BUCKET}
+  max-connections: ${S3_MAX_CONNECTIONS}
+  connection-timeout: ${S3_CONNECTION_TIMEOUT}
+  socket-timeout: ${S3_SOCKET_TIMEOUT}

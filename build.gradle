@@ -1,0 +1,52 @@
+plugins {
+	id 'java'
+	id 'org.springframework.boot' version '4.0.0-SNAPSHOT'
+	id 'io.spring.dependency-management' version '1.1.7'
+}
+
+var awsSdkVersion = '2.32.2'
+
+group = 'io.filemanager'
+version = '0.0.1-SNAPSHOT'
+
+java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(21)
+	}
+}
+
+configurations {
+	compileOnly {
+		extendsFrom annotationProcessor
+	}
+}
+
+repositories {
+	mavenCentral()
+	maven { url = 'https://repo.spring.io/milestone' }
+	maven { url = 'https://repo.spring.io/snapshot' }
+}
+
+dependencies {
+	implementation "org.springframework.boot:spring-boot-starter-webflux"
+	compileOnly "org.projectlombok:lombok"
+	annotationProcessor "org.projectlombok:lombok"
+	testImplementation "org.springframework.boot:spring-boot-starter-test"
+	testImplementation "org.springframework.boot:spring-boot-testcontainers"
+	testImplementation "com.adobe.testing:s3mock-testcontainers:4.6.0"
+
+	implementation "software.amazon.awssdk:s3:${awsSdkVersion}"
+	implementation "software.amazon.awssdk:s3-transfer-manager:${awsSdkVersion}"
+	implementation "software.amazon.awssdk.crt:aws-crt:0.38.7"
+
+	testImplementation "io.projectreactor:reactor-test"
+	testImplementation "org.testcontainers:junit-jupiter"
+	testRuntimeOnly "org.junit.platform:junit-platform-launcher"
+
+	testAnnotationProcessor "org.projectlombok:lombok"
+	testCompileOnly "org.projectlombok:lombok"
+}
+
+tasks.named('test') {
+	useJUnitPlatform()
+}
