@@ -1,9 +1,6 @@
-package io.filemanager.filez.controller;
+package io.filemanager.filez.files;
 
-import io.filemanager.filez.database.FileMetadata;
-import io.filemanager.filez.service.DownloadResult;
-import io.filemanager.filez.service.S3Service;
-import io.filemanager.filez.service.zipped.StreamingZipService;
+import io.filemanager.filez.shared.dto.DownloadResult;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,18 +28,15 @@ class FileControllerTest {
     private WebTestClient webTestClient; // A client for testing web endpoints without a real server
 
     @MockitoBean
-    private S3Service s3Service; // We mock the service layer
-
-    @MockitoBean
-    private StreamingZipService streamingZipService; // Also mock other dependencies
+    private FileService fileService; // We mock the service layer
 
     @Test
     @DisplayName("POST /upload should call service and return 200 OK with metadata")
     void uploadFile_success() {
         // --- Arrange ---
         // 1. Mock the service response
-        FileMetadata mockMetadata = new FileMetadata(1L, "response.txt", "text/plain", 100L);
-        when(s3Service.uploadFile(any())).thenReturn(Mono.just(mockMetadata));
+        File mockMetadata = new File(1L, "response.txt", "text/plain", 100L);
+        when(fileService.uploadFile(any())).thenReturn(Mono.just(mockMetadata));
 
         // 2. Build a multipart request
         MultipartBodyBuilder builder = new MultipartBodyBuilder();
@@ -55,7 +49,7 @@ class FileControllerTest {
                 .body(BodyInserters.fromMultipartData(builder.build()))
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(FileMetadata.class)
+                .expectBody(File.class)
                 .isEqualTo(mockMetadata);
     }
 
@@ -71,7 +65,7 @@ class FileControllerTest {
                 "text/plain",
                 Flux.just(ByteBuffer.wrap(fileBytes))
         );
-        when(s3Service.downloadFile(any(Long.class))).thenReturn(Mono.just(mockResult));
+        when(fileService.downloadFile(any(Long.class))).thenReturn(Mono.just(mockResult));
 
         // --- Act & Assert ---
         webTestClient.get().uri("/api/files/download/1")
@@ -87,7 +81,7 @@ class FileControllerTest {
     void downloadFileById_whenNotFound_returns404() {
         // --- Arrange ---
         // 1. Mock the service to return an empty Mono, simulating "not found"
-        when(s3Service.downloadFile(any(Long.class))).thenReturn(Mono.empty());
+        when(fileService.downloadFile(any(Long.class))).thenReturn(Mono.empty());
 
         // --- Act & Assert ---
         webTestClient.get().uri("/api/files/download/99")

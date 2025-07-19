@@ -1,8 +1,8 @@
-package io.filemanager.filez.service;
+package io.filemanager.filez.files;
 
-import io.filemanager.filez.database.FileMetadata;
-import io.filemanager.filez.database.FileMetadataRepository;
-import io.filemanager.filez.service.uploader.S3Uploader;
+import io.filemanager.filez.files.uploader.S3Uploader;
+import io.filemanager.filez.shared.dto.Bucket;
+import io.filemanager.filez.shared.dto.DownloadResult;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.multipart.FilePart;
@@ -15,7 +15,6 @@ import software.amazon.awssdk.services.s3.S3AsyncClient;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.ListBucketsResponse;
 
-
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Objects;
@@ -25,19 +24,19 @@ import java.util.Objects;
  * Service for handling business logic related to AWS S3 operations using S3AsyncClient.
  */
 @Service
-public class S3Service {
+public class FileService {
 
     private final S3AsyncClient s3AsyncClient;
     private final S3Uploader s3Uploader;
     private final String bucketName;
-    private final FileMetadataRepository metadataRepository;
+    private final FileRepository fileRepository;
 
 
-    public S3Service(S3AsyncClient s3AsyncClient, S3Uploader s3Uploader, @Value("${s3.bucket}") String bucketName, FileMetadataRepository metadataRepository) {
+    public FileService(S3AsyncClient s3AsyncClient, S3Uploader s3Uploader, @Value("${s3.bucket}") String bucketName, FileRepository fileRepository) {
         this.s3AsyncClient = s3AsyncClient;
         this.s3Uploader = s3Uploader;
         this.bucketName = bucketName;
-        this.metadataRepository = metadataRepository;
+        this.fileRepository = fileRepository;
     }
 
     public Mono<List<Bucket>> getBuckets() {
@@ -59,7 +58,7 @@ public class S3Service {
      * @param filePart A FilePart from a WebFlux request, representing the file to upload.
      * @return A Mono that completes with the PutObjectResponse when the upload is finished.
      */
-    public Mono<FileMetadata> uploadFile(FilePart filePart) {
+    public Mono<File> uploadFile(FilePart filePart) {
         String fileName = filePart.filename();
         // Get the content type, defaulting to a generic stream if not present.
         String contentType = Objects.toString(filePart.headers().getContentType(), MediaType.APPLICATION_OCTET_STREAM_VALUE);
@@ -70,12 +69,12 @@ public class S3Service {
         Flux<ByteBuffer> fileContent = filePart.content()
                 .flatMapSequential(dataBuffer -> Flux.fromIterable(dataBuffer::readableByteBuffers));
 
-        FileMetadata initialMetadata = new FileMetadata();
+        File initialMetadata = new File();
         initialMetadata.setFileName(fileName);
         initialMetadata.setFileType(contentType);
         initialMetadata.setSize(0L);
 
-            return metadataRepository.save(initialMetadata)
+        return fileRepository.save(initialMetadata)
                 .flatMap(savedMetadata -> {
                     String s3Key = savedMetadata.getId() + "-" + savedMetadata.getFileName();
 
@@ -88,14 +87,14 @@ public class S3Service {
                 })
                 .flatMap(tuple -> {
                     // Unpack the tuple containing both pieces of information
-                    FileMetadata metadataToUpdate = tuple.getT1();
+                    File metadataToUpdate = tuple.getT1();
                     var uploadResult = tuple.getT2();
 
                     // Update the metadata object with the final size
                     metadataToUpdate.setSize(uploadResult.size());
 
                     // Perform the final save (this is an update operation)
-                    return metadataRepository.save(metadataToUpdate);
+                    return fileRepository.save(metadataToUpdate);
                 });
     }
 
@@ -106,11 +105,10 @@ public class S3Service {
      *
      * @param id The primary key of the file in the database.
      * @return A Mono containing a DownloadResult with the file's stream and metadata,
-     *         or an empty Mono if the ID is not found.
+     * or an empty Mono if the ID is not found.
      */
     public Mono<DownloadResult> downloadFile(Long id) {
-        // Find the metadata in the database first.
-        return metadataRepository.findById(id)
+        return fileRepository.findById(id)
                 .flatMap(metadata -> {
                     String s3Key = metadata.getId() + "-" + metadata.getFileName();
                     GetObjectRequest getObjectRequest = GetObjectRequest.builder()

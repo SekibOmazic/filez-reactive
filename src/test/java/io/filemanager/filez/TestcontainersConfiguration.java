@@ -1,7 +1,7 @@
 package io.filemanager.filez;
 
 import com.adobe.testing.s3mock.testcontainers.S3MockContainer;
-import io.filemanager.filez.config.S3Properties;
+import io.filemanager.filez.shared.config.S3Properties;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;

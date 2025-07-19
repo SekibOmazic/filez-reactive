@@ -1,4 +1,4 @@
-package io.filemanager.filez.config;
+package io.filemanager.filez.shared.config;
 
 import lombok.Builder;
 import lombok.Getter;

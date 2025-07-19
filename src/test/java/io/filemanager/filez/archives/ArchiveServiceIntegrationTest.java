@@ -1,7 +1,7 @@
-package io.filemanager.filez.service.zipped;
+package io.filemanager.filez.archives;
 
-import io.filemanager.filez.database.FileMetadata;
-import io.filemanager.filez.database.FileMetadataRepository;
+import io.filemanager.filez.files.File;
+import io.filemanager.filez.files.FileRepository;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -46,7 +46,7 @@ import static org.mockito.Mockito.when;
 
 @Testcontainers
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
-class StreamingZipServiceIntegrationTest {
+class ArchiveServiceIntegrationTest {
 
     @Container
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:15-alpine");
@@ -66,10 +66,10 @@ class StreamingZipServiceIntegrationTest {
     private S3AsyncClient s3AsyncClient;
 
     @Autowired
-    private StreamingZipService streamingZipService;
+    private ArchiveService archiveService;
 
     @Autowired
-    private FileMetadataRepository metadataRepository;
+    private FileRepository metadataRepository;
 
     @BeforeEach
     void cleanup() {
@@ -113,8 +113,8 @@ class StreamingZipServiceIntegrationTest {
     @DisplayName("createZipStreamFromIds should produce a valid zip stream with correct files and content")
     void createZipStream_success() {
         // --- Arrange ---
-        FileMetadata file1 = metadataRepository.save(new FileMetadata(null, "first-file.txt", "text/plain", 10L, null, null)).block();
-        FileMetadata file2 = metadataRepository.save(new FileMetadata(null, "another/document.csv", "text/csv", 20L, null, null)).block();
+        File file1 = metadataRepository.save(new File(null, "first-file.txt", "text/plain", 10L, null, null)).block();
+        File file2 = metadataRepository.save(new File(null, "another/document.csv", "text/csv", 20L, null, null)).block();
         Assertions.assertNotNull(file1);
         Long id1 = file1.getId();
         String key1 = id1 + "-" + file1.getFileName();
@@ -129,7 +129,7 @@ class StreamingZipServiceIntegrationTest {
         mockS3GetObject(key2, content2);
 
         // --- Act ---
-        Flux<ByteBuffer> zipStream = streamingZipService.createZipStreamFromIds(List.of(id1, id2));
+        Flux<ByteBuffer> zipStream = archiveService.createZipStreamFromIds(List.of(id1, id2));
 
         // --- Assert ---
         Mono<byte[]> aggregatedBytesMono = zipStream

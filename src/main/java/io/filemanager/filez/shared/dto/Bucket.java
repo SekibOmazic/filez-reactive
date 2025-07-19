@@ -1,4 +1,4 @@
-package io.filemanager.filez.service;
+package io.filemanager.filez.shared.dto;
 
 import java.time.Instant;
 

@@ -1,9 +1,8 @@
-package io.filemanager.filez.service;
+package io.filemanager.filez.files;
 
-import io.filemanager.filez.database.FileMetadata;
-import io.filemanager.filez.database.FileMetadataRepository;
-import io.filemanager.filez.service.uploader.S3Uploader;
-import io.filemanager.filez.service.uploader.UploadResult;
+import io.filemanager.filez.files.uploader.S3Uploader;
+import io.filemanager.filez.files.uploader.UploadResult;
+import io.filemanager.filez.shared.dto.DownloadResult;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -43,7 +42,7 @@ import static org.mockito.Mockito.when;
 
 @Testcontainers
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
-class S3ServiceIntegrationTest {
+class FileServiceIntegrationTest {
 
     @Container
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:15-alpine");
@@ -65,10 +64,10 @@ class S3ServiceIntegrationTest {
     private S3AsyncClient s3AsyncClient;
 
     @Autowired
-    private S3Service s3Service;
+    private FileService fileService;
 
     @Autowired
-    private FileMetadataRepository metadataRepository;
+    private FileRepository metadataRepository;
 
     @BeforeEach
     void cleanup() {
@@ -93,7 +92,7 @@ class S3ServiceIntegrationTest {
         when(s3Uploader.uploadFile(any(), any(), any())).thenReturn(Mono.just(mockUploadResult));
 
         // Act
-        Mono<FileMetadata> resultMono = s3Service.uploadFile(mockFilePart);
+        Mono<File> resultMono = fileService.uploadFile(mockFilePart);
 
         // Assert
         StepVerifier.create(resultMono)
@@ -109,8 +108,8 @@ class S3ServiceIntegrationTest {
     @DisplayName("downloadFile should return file stream and metadata when ID exists")
     void downloadFile_whenIdExists_shouldReturnResult() {
         // --- Arrange ---
-        FileMetadata savedMetadata = metadataRepository.save(
-                new FileMetadata(null, "document.pdf", "application/pdf", 12345L)
+        File savedMetadata = metadataRepository.save(
+                new File(null, "document.pdf", "application/pdf", 12345L)
         ).block();
         Assertions.assertNotNull(savedMetadata);
         Long fileId = savedMetadata.getId();
@@ -144,7 +143,7 @@ class S3ServiceIntegrationTest {
 
 
         // --- Act ---
-        Mono<DownloadResult> resultMono = s3Service.downloadFile(fileId);
+        Mono<DownloadResult> resultMono = fileService.downloadFile(fileId);
 
         // --- Assert ---
         StepVerifier.create(resultMono)

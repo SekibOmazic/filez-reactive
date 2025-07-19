@@ -1,4 +1,4 @@
-package io.filemanager.filez.service.zipped;
+package io.filemanager.filez.archives;
 
 import lombok.*;
 

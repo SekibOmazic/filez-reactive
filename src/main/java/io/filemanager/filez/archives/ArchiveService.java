@@ -1,6 +1,6 @@
-package io.filemanager.filez.service.zipped;
+package io.filemanager.filez.archives;
 
-import io.filemanager.filez.database.FileMetadataRepository;
+import io.filemanager.filez.files.FileRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
@@ -22,14 +22,14 @@ import java.util.zip.CRC32;
 import java.util.zip.Deflater;
 
 @Service
-public class StreamingZipService {
+public class ArchiveService {
 
     private final S3AsyncClient s3AsyncClient;
     private final String bucketName;
-    private final FileMetadataRepository metadataRepository;
+    private final FileRepository metadataRepository;
 
 
-    public StreamingZipService(S3AsyncClient s3AsyncClient, @Value("${s3.bucket}") String bucketName, FileMetadataRepository metadataRepository) {
+    public ArchiveService(S3AsyncClient s3AsyncClient, @Value("${s3.bucket}") String bucketName, FileRepository metadataRepository) {
         this.s3AsyncClient = s3AsyncClient;
         this.bucketName = bucketName;
         this.metadataRepository = metadataRepository;

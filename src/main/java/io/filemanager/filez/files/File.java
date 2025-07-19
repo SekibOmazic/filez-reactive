@@ -1,4 +1,4 @@
-package io.filemanager.filez.database;
+package io.filemanager.filez.files;
 
 import lombok.*;
 import org.springframework.data.annotation.CreatedDate;
@@ -12,16 +12,16 @@ import java.time.Instant;
 @Data
 @NoArgsConstructor
 @Table("file_metadata")
-public class FileMetadata {
+public class File {
 
-    public FileMetadata(Long id, String fileName, String contentType, long size) {
+    public File(Long id, String fileName, String contentType, long size) {
         this.id = id;
         this.fileName = fileName;
         this.fileType = contentType;
         this.size = size;
     }
 
-    public FileMetadata(Long id, String fileName, String contentType, long size, Instant createdAt, Instant updatedAt) {
+    public File(Long id, String fileName, String contentType, long size, Instant createdAt, Instant updatedAt) {
         this(id, fileName, contentType, size);
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;

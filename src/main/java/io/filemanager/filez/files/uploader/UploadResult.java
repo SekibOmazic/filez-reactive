@@ -1,4 +1,4 @@
-package io.filemanager.filez.service.uploader;
+package io.filemanager.filez.files.uploader;
 
 import software.amazon.awssdk.services.s3.model.PutObjectResponse;
 

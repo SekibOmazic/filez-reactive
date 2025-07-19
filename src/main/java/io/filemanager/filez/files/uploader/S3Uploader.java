@@ -1,4 +1,4 @@
-package io.filemanager.filez.service.uploader;
+package io.filemanager.filez.files.uploader;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;

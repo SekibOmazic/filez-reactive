@@ -1,4 +1,4 @@
-package io.filemanager.filez.config;
+package io.filemanager.filez.shared.config;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
