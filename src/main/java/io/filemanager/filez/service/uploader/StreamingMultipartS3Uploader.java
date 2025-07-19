@@ -1,7 +1,6 @@
 package io.filemanager.filez.service.uploader;
 
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -14,9 +13,9 @@ import java.time.Duration;
 import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 @Component
-@Profile("test")
 public class StreamingMultipartS3Uploader implements S3Uploader {
 
     private static final int PART_SIZE_IN_BYTES = 5 * 1024 * 1024;
@@ -30,7 +29,12 @@ public class StreamingMultipartS3Uploader implements S3Uploader {
     }
 
     @Override
-    public Mono<PutObjectResponse> uploadFile(String key, Flux<ByteBuffer> fileContent, String contentType) {
+    public Mono<UploadResult> uploadFile(String key, Flux<ByteBuffer> fileContent, String contentType) {
+        final AtomicLong totalSize = new AtomicLong(0);
+
+        // Create a new Flux that counts bytes as they flow through
+        Flux<ByteBuffer> countedContent = fileContent.doOnNext(bb -> totalSize.addAndGet(bb.remaining()));
+
         CreateMultipartUploadRequest createRequest = CreateMultipartUploadRequest.builder()
                 .bucket(bucketName).key(key).contentType(contentType).build();
 
@@ -39,15 +43,17 @@ public class StreamingMultipartS3Uploader implements S3Uploader {
                     String uploadId = createResponse.uploadId();
                     AtomicInteger partNumber = new AtomicInteger(1);
 
-                    Flux<CompletedPart> completedPartsFlux = fileContent
+                    Flux<CompletedPart> completedPartsFlux = countedContent
                             .bufferTimeout(PART_SIZE_IN_BYTES, Duration.ofSeconds(5))
                             .concatMap(byteBufferList -> uploadPart(uploadId, key, partNumber.getAndIncrement(), byteBufferList));
 
                     return completedPartsFlux.collectList()
                             .flatMap(completedParts -> completeUpload(uploadId, key, completedParts))
+                            .map(response -> new UploadResult(response, totalSize.get()))
                             .doOnError(ex -> abortUpload(uploadId, key));
                 });
     }
+
 
     private Mono<CompletedPart> uploadPart(String uploadId, String key, int partNumber, List<ByteBuffer> byteBufferList) {
         int totalSize = byteBufferList.stream().mapToInt(ByteBuffer::remaining).sum();

@@ -6,8 +6,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.Bean;
 import org.springframework.test.context.ActiveProfiles;
+import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
 @Slf4j
@@ -15,6 +17,7 @@ import org.testcontainers.utility.DockerImageName;
 @TestConfiguration(proxyBeanMethods = false)
 class TestcontainersConfiguration {
     private static final String S3_MOCK = "adobe/s3mock:latest";
+    private static final String POSTGRES_IMAGE = "postgres:13.1-alpine";
 
     ///////////////
     // CONTAINERS
@@ -25,6 +28,33 @@ class TestcontainersConfiguration {
 
         return new S3MockContainer(DockerImageName.parse(S3_MOCK))
                 .withValidKmsKeys("arn:aws:kms:us-east-1:1234567890:key/valid-test-key-ref");
+    }
+
+/*
+    we use sprint.sql.init.mode=true, see application-test.yaml
+
+    @Bean
+    public ConnectionFactoryInitializer initializer(ConnectionFactory connectionFactory) {
+        ConnectionFactoryInitializer initializer = new ConnectionFactoryInitializer();
+
+        initializer.setConnectionFactory(connectionFactory);
+        initializer.setDatabasePopulator(
+                new ResourceDatabasePopulator(new ClassPathResource("schema.sql"))
+        );
+        return initializer;
+    }
+*/
+
+    @Bean
+    @ServiceConnection
+    public PostgreSQLContainer<?> postgresContainer() {
+        log.warn("Starting PostgreSQL container with image: {}", POSTGRES_IMAGE);
+
+        return new PostgreSQLContainer<>(DockerImageName.parse(POSTGRES_IMAGE))
+                .withDatabaseName("testdb")
+                .withUsername("testuser")
+                .withPassword("testpass")
+                .withExposedPorts(5432);
     }
 
     ///////////////

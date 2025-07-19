@@ -1,5 +1,6 @@
 package io.filemanager.filez.service.zipped;
 
+import io.filemanager.filez.database.FileMetadataRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
@@ -25,13 +26,25 @@ public class StreamingZipService {
 
     private final S3AsyncClient s3AsyncClient;
     private final String bucketName;
+    private final FileMetadataRepository metadataRepository;
 
-    public StreamingZipService(S3AsyncClient s3AsyncClient, @Value("${s3.bucket}") String bucketName) {
+
+    public StreamingZipService(S3AsyncClient s3AsyncClient, @Value("${s3.bucket}") String bucketName, FileMetadataRepository metadataRepository) {
         this.s3AsyncClient = s3AsyncClient;
         this.bucketName = bucketName;
+        this.metadataRepository = metadataRepository;
     }
 
-    public Flux<ByteBuffer> createZipStream(List<String> s3Keys) {
+    public Flux<ByteBuffer> createZipStreamFromIds(List<Long> ids) {
+        // Find all metadata records, then map them to their S3 keys
+        Flux<String> s3Keys = metadataRepository.findAllById(ids)
+                .map(metadata -> metadata.getId() + "-" + metadata.getFileName());
+
+        // Collect the keys into a list and pass to our existing zip logic
+        return s3Keys.collectList().flatMapMany(this::createZipStream);
+    }
+
+    private Flux<ByteBuffer> createZipStream(List<String> s3Keys) {
         // This list will be populated as a side-effect when each file stream completes.
         final List<ZipEntryInfo> zipEntries = new ArrayList<>();
 
@@ -46,6 +59,7 @@ public class StreamingZipService {
         // The Mono returned here will only be subscribed to after the combinedStream completes.
         return combinedStream.concatWith(createCentralDirectoryStream(zipEntries));
     }
+
 
     /**
      * Creates a reactive stream for a single ZIP entry, consisting of:
@@ -115,7 +129,6 @@ public class StreamingZipService {
      */
     private Mono<ByteBuffer> createCentralDirectoryStream(List<ZipEntryInfo> zipEntries) {
         return Mono.fromCallable(() -> {
-            // THIS IS THE NEW, ROBUST LOGIC
             // 1. Calculate the final offsets deterministically.
             long currentOffset = 0;
             for (ZipEntryInfo entry : zipEntries) {
@@ -132,7 +145,6 @@ public class StreamingZipService {
 
             for (ZipEntryInfo entry : zipEntries) {
                 centralDirectoryBuffer.putInt(0x02014b50); // Signature
-                // ... (rest of the fields are the same)
                 centralDirectoryBuffer.putShort((short) 20);
                 centralDirectoryBuffer.putShort((short) 20);
                 centralDirectoryBuffer.putShort((short) (1 << 3));
@@ -151,7 +163,7 @@ public class StreamingZipService {
                 centralDirectoryBuffer.put(entry.getFileNameBytes());
             }
 
-            long centralDirectorySize = (long) centralDirectoryBuffer.position();
+            long centralDirectorySize = centralDirectoryBuffer.position();
 
             // 3. Build the End of Central Directory Record.
             centralDirectoryBuffer.putInt(0x06054b50); // Signature
@@ -172,7 +184,6 @@ public class StreamingZipService {
         });
     }
 
-    // --- Helper methods (unchanged) ---
     private ByteBuffer createLocalFileHeader(String fileName) {
         byte[] fileNameBytes = fileName.getBytes(StandardCharsets.UTF_8);
         ByteBuffer buffer = ByteBuffer.allocate(30 + fileNameBytes.length).order(ByteOrder.LITTLE_ENDIAN);

@@ -1,21 +1,19 @@
 package io.filemanager.filez.service;
 
+import io.filemanager.filez.database.FileMetadata;
+import io.filemanager.filez.database.FileMetadataRepository;
 import io.filemanager.filez.service.uploader.S3Uploader;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.buffer.DataBuffer;
-import org.springframework.core.io.buffer.DefaultDataBufferFactory;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.multipart.FilePart;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import software.amazon.awssdk.core.async.AsyncRequestBody;
+import reactor.util.function.Tuples;
 import software.amazon.awssdk.core.async.AsyncResponseTransformer;
 import software.amazon.awssdk.services.s3.S3AsyncClient;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.ListBucketsResponse;
-import software.amazon.awssdk.services.s3.model.PutObjectRequest;
-import software.amazon.awssdk.services.s3.model.PutObjectResponse;
 
 
 import java.nio.ByteBuffer;
@@ -32,15 +30,27 @@ public class S3Service {
     private final S3AsyncClient s3AsyncClient;
     private final S3Uploader s3Uploader;
     private final String bucketName;
+    private final FileMetadataRepository metadataRepository;
 
-    public S3Service(S3AsyncClient s3AsyncClient, S3Uploader s3Uploader, @Value("${s3.bucket}") String bucketName) {
+
+    public S3Service(S3AsyncClient s3AsyncClient, S3Uploader s3Uploader, @Value("${s3.bucket}") String bucketName, FileMetadataRepository metadataRepository) {
         this.s3AsyncClient = s3AsyncClient;
         this.s3Uploader = s3Uploader;
         this.bucketName = bucketName;
+        this.metadataRepository = metadataRepository;
     }
 
     public Mono<List<Bucket>> getBuckets() {
-        return Mono.fromFuture(s3AsyncClient.listBuckets()).map(ListBucketsResponse::buckets).map(buckets -> buckets.stream().map(bucket -> new Bucket(bucket.name(), bucket.bucketRegion(), bucket.bucketArn(), bucket.creationDate())).toList());
+        return Mono.fromFuture(s3AsyncClient.listBuckets())
+                .map(ListBucketsResponse::buckets)
+                .map(buckets ->
+                        buckets.stream().map(bucket -> new Bucket(
+                                bucket.name(),
+                                bucket.bucketRegion(),
+                                bucket.bucketArn(),
+                                bucket.creationDate()
+                        )).toList()
+                );
     }
 
     /**
@@ -49,62 +59,71 @@ public class S3Service {
      * @param filePart A FilePart from a WebFlux request, representing the file to upload.
      * @return A Mono that completes with the PutObjectResponse when the upload is finished.
      */
-    public Mono<PutObjectResponse> uploadFile(FilePart filePart) {
-        String key = filePart.filename();
+    public Mono<FileMetadata> uploadFile(FilePart filePart) {
+        String fileName = filePart.filename();
         // Get the content type, defaulting to a generic stream if not present.
         String contentType = Objects.toString(filePart.headers().getContentType(), MediaType.APPLICATION_OCTET_STREAM_VALUE);
 
         // Convert the file's content from a Flux<DataBuffer> to a Flux<ByteBuffer>.
         // This is the required type for the AWS SDK v2's async request bodies.
-        Flux<ByteBuffer> fileContent = filePart.content().map(DataBuffer::asByteBuffer);
+        // Using flatMapSequential to ensure that the DataBuffers are processed in order.
+        Flux<ByteBuffer> fileContent = filePart.content()
+                .flatMapSequential(dataBuffer -> Flux.fromIterable(dataBuffer::readableByteBuffers));
 
-        return s3Uploader.uploadFile(key, fileContent, contentType);
+        FileMetadata initialMetadata = new FileMetadata();
+        initialMetadata.setFileName(fileName);
+        initialMetadata.setFileType(contentType);
+        initialMetadata.setSize(0L);
+
+            return metadataRepository.save(initialMetadata)
+                .flatMap(savedMetadata -> {
+                    String s3Key = savedMetadata.getId() + "-" + savedMetadata.getFileName();
+
+                    // Perform the upload. After it's done, combine its result (uploadResult)
+                    // with the data we already have (savedMetadata) into a Tuple.
+                    // We could also use a custom class instead of Tuples, but for simplicity,
+                    // we use Tuples here.
+                    return s3Uploader.uploadFile(s3Key, fileContent, contentType)
+                            .map(uploadResult -> Tuples.of(savedMetadata, uploadResult));
+                })
+                .flatMap(tuple -> {
+                    // Unpack the tuple containing both pieces of information
+                    FileMetadata metadataToUpdate = tuple.getT1();
+                    var uploadResult = tuple.getT2();
+
+                    // Update the metadata object with the final size
+                    metadataToUpdate.setSize(uploadResult.size());
+
+                    // Perform the final save (this is an update operation)
+                    return metadataRepository.save(metadataToUpdate);
+                });
     }
 
-
-
-    public Mono<PutObjectResponse> uploadFile_OLD(FilePart filePart) {
-        String fileKey = filePart.filename();
-
-        // Build the request object with metadata.
-        PutObjectRequest putObjectRequest = PutObjectRequest.builder()
-                .bucket(bucketName)
-                .key(fileKey)
-                .contentType(Objects.requireNonNull(filePart.headers().getContentType()).toString())
-                //.contentLength(filePart.headers().getContentLength())
-                .build();
-
-        // The AsyncRequestBody.fromPublisher streams the file content directly.
-        // The Flux<ByteBuffer> from filePart.content() is published to S3 without
-        // buffering the entire file in memory.
-        AsyncRequestBody requestBody = AsyncRequestBody.fromPublisher(
-            filePart.content().map(DataBuffer::asByteBuffer)
-        );
-
-        // The putObject method returns a CompletableFuture, which we convert to a Mono.
-        return Mono.fromFuture(s3AsyncClient.putObject(putObjectRequest, requestBody));
-    }
 
     /**
-     * Downloads a file from S3 as a non-blocking stream of data.
+     * Downloads a file by its ID. It fetches metadata from the database and then streams
+     * the corresponding file from S3.
      *
-     * @param fileKey The key of the file to download.
-     * @return A Flux of DataBuffers representing the file's content.
+     * @param id The primary key of the file in the database.
+     * @return A Mono containing a DownloadResult with the file's stream and metadata,
+     *         or an empty Mono if the ID is not found.
      */
-    public Flux<DataBuffer> downloadFile(String fileKey) {
-        GetObjectRequest getObjectRequest = GetObjectRequest.builder()
-                .bucket(bucketName)
-                .key(fileKey)
-                .build();
+    public Mono<DownloadResult> downloadFile(Long id) {
+        // Find the metadata in the database first.
+        return metadataRepository.findById(id)
+                .flatMap(metadata -> {
+                    String s3Key = metadata.getId() + "-" + metadata.getFileName();
+                    GetObjectRequest getObjectRequest = GetObjectRequest.builder()
+                            .bucket(bucketName)
+                            .key(s3Key)
+                            .build();
 
-        // The AsyncResponseTransformer.toPublisher() is key here. It transforms the
-        // incoming S3 data into a Publisher (which we can use as a Flux) of ByteBuffers.
-        // This ensures the data is streamed from S3 and sent to the client as it arrives.
-        return Mono.fromFuture(s3AsyncClient.getObject(
-                getObjectRequest,
-                AsyncResponseTransformer.toPublisher()
-        )).flatMapMany(response -> Flux.from(response).map(
-                DefaultDataBufferFactory.sharedInstance::wrap
-        ));
+                    // Get the file stream from S3.
+                    Flux<ByteBuffer> fileStream = Mono.fromFuture(s3AsyncClient.getObject(getObjectRequest, AsyncResponseTransformer.toPublisher()))
+                            .flatMapMany(Flux::from);
+
+                    return Mono.just(new DownloadResult(metadata.getFileName(), metadata.getFileType(), fileStream));
+                });
+        // If findById returns empty, the whole chain will result in an empty Mono.
     }
 }
