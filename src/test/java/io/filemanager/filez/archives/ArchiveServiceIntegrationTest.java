@@ -113,8 +113,8 @@ class ArchiveServiceIntegrationTest {
     @DisplayName("createZipStreamFromIds should produce a valid zip stream with correct files and content")
     void createZipStream_success() {
         // --- Arrange ---
-        File file1 = metadataRepository.save(new File(null, "first-file.txt", "text/plain", 10L, null, null)).block();
-        File file2 = metadataRepository.save(new File(null, "another/document.csv", "text/csv", 20L, null, null)).block();
+        File file1 = metadataRepository.save(new File(null, "first-file.txt", "text/plain", 10L)).block();
+        File file2 = metadataRepository.save(new File(null, "another/document.csv", "text/csv", 20L)).block();
         Assertions.assertNotNull(file1);
         Long id1 = file1.getId();
         String key1 = id1 + "-" + file1.getFileName();

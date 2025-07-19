@@ -15,7 +15,7 @@ import org.testcontainers.utility.DockerImageName;
 @Slf4j
 @ActiveProfiles("test")
 @TestConfiguration(proxyBeanMethods = false)
-class TestcontainersConfiguration {
+public class TestcontainersConfiguration {
     private static final String S3_MOCK = "adobe/s3mock:latest";
     private static final String POSTGRES_IMAGE = "postgres:13.1-alpine";
 

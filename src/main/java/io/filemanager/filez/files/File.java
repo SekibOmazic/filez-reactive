@@ -21,11 +21,6 @@ public class File {
         this.size = size;
     }
 
-    public File(Long id, String fileName, String contentType, long size, Instant createdAt, Instant updatedAt) {
-        this(id, fileName, contentType, size);
-        this.createdAt = createdAt;
-        this.updatedAt = updatedAt;
-    }
 
     @Id
     private Long id;
@@ -45,7 +40,4 @@ public class File {
     @LastModifiedDate
     @Column("updated_at")
     private Instant updatedAt;
-
-
-
 }

@@ -22,10 +22,10 @@ import static org.mockito.Mockito.when;
 class ArchivesControllerTest {
 
     @Autowired
-    private WebTestClient webTestClient; // A client for testing web endpoints without a real server
+    private WebTestClient webTestClient;
 
     @MockitoBean
-    private ArchiveService archiveService; // Also mock other dependencies
+    private ArchiveService archiveService;
 
 
     @Test
@@ -33,7 +33,6 @@ class ArchivesControllerTest {
     void downloadFilesAsZip_success() {
         // --- Arrange ---
         // 1. Define the mock data that the service will return.
-        // This doesn't have to be a real zip file, just some bytes.
         String fakeZipContent = "this-is-fake-zip-data";
         byte[] fakeBytes = fakeZipContent.getBytes(StandardCharsets.UTF_8);
         Flux<ByteBuffer> mockStream = Flux.just(ByteBuffer.wrap(fakeBytes));

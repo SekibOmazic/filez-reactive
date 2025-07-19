@@ -4,8 +4,7 @@ import lombok.*;
 
 import java.nio.charset.StandardCharsets;
 
-@Getter
-@Setter
+@Data
 @RequiredArgsConstructor
 public class ZipEntryInfo {
     private final String fileName;
