@@ -22,7 +22,7 @@ public class ArchivesController {
 
     @PostMapping("/download-zip")
     public Mono<ResponseEntity<Flux<ByteBuffer>>> downloadFilesAsZip(
-            @RequestBody List<Long> fileIds, // We now receive a list of database IDs
+            @RequestBody List<Long> fileIds,
             @RequestParam(defaultValue = "archive.zip") String zipName) {
 
         Flux<ByteBuffer> zipStream = archiveService.createZipStreamFromIds(fileIds);

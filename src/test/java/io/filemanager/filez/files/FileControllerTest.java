@@ -21,14 +21,14 @@ import java.nio.charset.StandardCharsets;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
-@WebFluxTest(FileController.class) // Focus only on the FileController
+@WebFluxTest(FileController.class)
 class FileControllerTest {
 
     @Autowired
-    private WebTestClient webTestClient; // A client for testing web endpoints without a real server
+    private WebTestClient webTestClient;
 
     @MockitoBean
-    private FileService fileService; // We mock the service layer
+    private FileService fileService;
 
     @Test
     @DisplayName("POST /upload should call service and return 200 OK with metadata")

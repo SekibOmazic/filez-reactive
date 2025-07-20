@@ -39,7 +39,7 @@ class StreamingMultipartS3UploaderIntegrationTest {
     private S3Properties s3Properties;
 
     @Value("${s3.bucket}")
-    private String bucketName; // This will be injected with the value from application-test.yaml
+    private String bucketName;
 
 
     // Create the bucket in the mock S3 before each test.
