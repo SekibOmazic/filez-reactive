@@ -17,6 +17,7 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.zip.CRC32;
 import java.util.zip.Deflater;
@@ -105,7 +106,7 @@ public class ArchiveService {
                         return copyByteBuffer(finalChunk);
                     }
                     return null;
-                }).filter(b -> b != null))
+                }).filter(Objects::nonNull))
                 .doOnComplete(deflater::end); // Clean up native resources
 
         Mono<ByteBuffer> dataDescriptorStream = Mono.fromCallable(() -> {

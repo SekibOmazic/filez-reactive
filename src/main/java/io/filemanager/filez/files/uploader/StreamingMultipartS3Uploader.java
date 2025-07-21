@@ -76,12 +76,10 @@ public class StreamingMultipartS3Uploader implements S3Uploader {
                 .multipartUpload(completedMultipartUpload).build();
 
         return Mono.fromFuture(s3AsyncClient.completeMultipartUpload(completeRequest))
-                .map(completeResponse -> {
-                    return PutObjectResponse.builder()
-                            .eTag(completeResponse.eTag())
-                            .versionId(completeResponse.versionId())
-                            .build();
-                });
+                .map(completeResponse -> PutObjectResponse.builder()
+                        .eTag(completeResponse.eTag())
+                        .versionId(completeResponse.versionId())
+                        .build());
     }
 
     private void abortUpload(String uploadId, String key) {
