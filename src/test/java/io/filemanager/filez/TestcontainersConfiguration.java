@@ -27,7 +27,7 @@ public class TestcontainersConfiguration {
         log.warn("Starting S3 Mock container with image: {}", S3_MOCK);
 
         return new S3MockContainer(DockerImageName.parse(S3_MOCK))
-                .withValidKmsKeys("arn:aws:kms:us-east-1:1234567890:key/valid-test-key-ref");
+                .withValidKmsKeys("arn:aws:kms:eu-central-1:1234567890:key/valid-test-key-ref");
     }
 
 /*

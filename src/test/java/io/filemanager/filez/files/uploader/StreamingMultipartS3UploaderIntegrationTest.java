@@ -2,6 +2,7 @@ package io.filemanager.filez.files.uploader;
 
 import io.filemanager.filez.shared.config.S3Properties;
 import io.filemanager.filez.TestcontainersConfiguration;
+import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -14,6 +15,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 import software.amazon.awssdk.services.s3.S3AsyncClient;
+import software.amazon.awssdk.services.s3.model.BucketAlreadyOwnedByYouException;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
 
@@ -23,6 +25,7 @@ import java.util.concurrent.CompletableFuture;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@Slf4j
 @SpringBootTest
 @ActiveProfiles("test")
 @Import(TestcontainersConfiguration.class)
@@ -49,7 +52,15 @@ class StreamingMultipartS3UploaderIntegrationTest {
         s3AsyncClient.createBucket(b -> b.bucket(bucketName))
                 // Ignore errors if the bucket already exists from a previous test run
                 .exceptionally(err -> {
-                    if (err.getMessage().contains("BucketAlreadyExists")) return null;
+                    Throwable cause = err.getCause();
+
+                    // Check if the cause is the specific S3 exception we want to ignore.
+                    if (cause instanceof BucketAlreadyOwnedByYouException) {
+                        log.warn("Bucket '{}' already exists, continuing.", bucketName);
+                        return null;
+                    }
+
+                    // If it's any other error, rethrow it to fail the test.
                     throw new RuntimeException(err);
                 })
                 .join();
